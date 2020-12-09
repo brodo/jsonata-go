@@ -10,8 +10,13 @@ type Token struct {
 
 const (
 	// Identifiers + literals
-	IDENT = "IDENT" // variable names, function names
-	INT   = "INT"
+	IDENT  = "IDENT" // variable names, function names
+	NUMBER = "NUMBER"
+
+	// Keywords
+	TRUE  = "TRUE"
+	FALSE = "FALSE"
+	NULL  = "NULL"
 
 	// Operators
 	DOT         = "."
@@ -50,14 +55,19 @@ const (
 	CONCAT      = "&"
 	BANG        = "!"
 	TILDE       = "~"
-	EOF         = "EOF"
-	INVALID     = "INVALID"
+
+	// Other
+	EOF     = "EOF"
+	INVALID = "INVALID"
 )
 
 var keywords = map[string]TokType{
-	"and": AND,
-	"or":  OR,
-	"in":  IN,
+	"and":   AND,
+	"or":    OR,
+	"in":    IN,
+	"true":  TRUE,
+	"false": FALSE,
+	"null":  NULL,
 }
 
 func LookupIdent(ident string) TokType {

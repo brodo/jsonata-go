@@ -2,8 +2,11 @@ package lexer
 
 import (
 	"github.com/brodo/jsonata-go/token"
+	"regexp"
 	"unicode"
 )
+
+var numberRegex = regexp.MustCompile("-?(0|([1-9][0-9]*))(\\.[0-9]+)?([Ee][-+]?[0-9]+)?")
 
 type Lexer struct {
 	input        []rune
@@ -73,6 +76,9 @@ func (l *Lexer) NextToken() token.Token {
 	case '+':
 		tok = l.newToken(token.PLUS, l.ch)
 	case '-':
+		if numberRegex.MatchString(string(l.input[l.position:])) {
+			return l.readNumber()
+		}
 		tok = l.newToken(token.MINUS, l.ch)
 	case '*':
 		tok = l.makeTwoCharToken('*', token.ASTERISK, token.DESCENDANTS)
@@ -101,19 +107,32 @@ func (l *Lexer) NextToken() token.Token {
 		tok.Type = token.EOF
 
 	default:
-		if unicode.IsLetter(l.ch) {
+		if !unicode.IsDigit(l.ch) && !unicode.Is(unicode.White_Space, l.ch) {
 			tok.Literal = l.readIdentifier()
 			tok.Type = token.LookupIdent(tok.Literal)
 			return tok
-		} else if unicode.IsDigit(l.ch) {
-			tok.Type = token.INT
-			tok.Literal = l.readNumber()
-			return tok
+		} else if numberRegex.MatchString(string(l.input[l.position:])) {
+			return l.readNumber()
 		} else {
 			tok = l.newToken(token.INVALID, l.ch)
 		}
 	}
 	l.readRune()
+	return tok
+}
+
+func (l *Lexer) readNumber() token.Token {
+	var tok token.Token
+	match := numberRegex.FindStringIndex(string(l.input[l.position:]))
+	tok.Type = token.NUMBER
+	tok.Literal = string(l.input[l.position : l.position+match[1]])
+	l.position += match[1]
+	l.readPosition = l.position + 1
+	if l.position < len(l.input) {
+		l.ch = l.input[l.position]
+	} else {
+		l.ch = 0
+	}
 	return tok
 }
 
@@ -142,15 +161,7 @@ func (l *Lexer) skipWhitespace() {
 
 func (l *Lexer) readIdentifier() string {
 	position := l.position
-	for unicode.IsLetter(l.ch) {
-		l.readRune()
-	}
-	return string(l.input[position:l.position])
-}
-
-func (l *Lexer) readNumber() string {
-	position := l.position
-	for unicode.IsDigit(l.ch) {
+	for !unicode.Is(unicode.White_Space, l.ch) && l.ch != 0 {
 		l.readRune()
 	}
 	return string(l.input[position:l.position])
