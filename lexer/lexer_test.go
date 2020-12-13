@@ -120,3 +120,32 @@ func TestNextTokenNumbers(t *testing.T) {
 		}
 	}
 }
+
+func TestNextTokenWhitespaceNames(t *testing.T) {
+	input := "Other.`Over 18 ?` lala.`this \\` is a test` `another \\\\` lala"
+	tests := []struct {
+		expectedType    token.TokType
+		expectedLiteral string
+	}{
+		{token.IDENT, "Other"},
+		{token.DOT, "."},
+		{token.IDENT, "Over 18 ?"},
+		{token.IDENT, "lala"},
+		{token.DOT, "."},
+		{token.IDENT, "this \\` is a test"},
+		{token.IDENT, "another \\\\"},
+	}
+
+	l := NewLexer(input)
+
+	for i, tt := range tests {
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Fatalf("test[%d] - tokentype wrong. expected=%q, got=%q.", i, tt.expectedType, tok.Type)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("test[%d] - literal wrong. expected=%q, got=%q", i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}

@@ -12,6 +12,7 @@ const (
 	// Identifiers + literals
 	IDENT  = "IDENT" // variable names, function names
 	NUMBER = "NUMBER"
+	STRING = "STRING"
 
 	// Keywords
 	TRUE  = "TRUE"
@@ -59,6 +60,7 @@ const (
 	// Other
 	EOF     = "EOF"
 	INVALID = "INVALID"
+	REGEX   = "REGEX"
 )
 
 var keywords = map[string]TokType{

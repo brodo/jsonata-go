@@ -102,12 +102,18 @@ func (l *Lexer) NextToken() token.Token {
 		tok = l.makeTwoCharToken('=', token.BANG, token.NQE)
 	case '~':
 		tok = l.makeTwoCharToken('>', token.TILDE, token.CHAIN)
+	case '`':
+		tok = l.readUntilRune('`', token.IDENT)
+	case '\'':
+		tok = l.readUntilRune('\'', token.STRING)
+	case '"':
+		tok = l.readUntilRune('"', token.STRING)
 	case 0:
 		tok.Literal = ""
 		tok.Type = token.EOF
 
 	default:
-		if !unicode.IsDigit(l.ch) && !unicode.Is(unicode.White_Space, l.ch) {
+		if !unicode.Is(unicode.White_Space, l.ch) && !isReservedCharacter(l.ch) && l.ch != 0 && !unicode.IsDigit(l.ch) {
 			tok.Literal = l.readIdentifier()
 			tok.Type = token.LookupIdent(tok.Literal)
 			return tok
@@ -117,6 +123,31 @@ func (l *Lexer) NextToken() token.Token {
 			tok = l.newToken(token.INVALID, l.ch)
 		}
 	}
+	l.readRune()
+	return tok
+}
+
+func (l *Lexer) readUntilRune(enclosingRune rune, tokenType token.TokType) token.Token {
+	l.readRune()
+	var tok token.Token
+	tok.Type = tokenType
+	position := l.position
+	numBackslashes := 0
+	isEscaped := false
+	for l.ch != enclosingRune || isEscaped {
+		if l.ch == '\\' {
+			numBackslashes++
+		} else {
+			numBackslashes = max(numBackslashes, 0)
+		}
+		if numBackslashes%2 != 0 {
+			isEscaped = true
+		} else {
+			isEscaped = false
+		}
+		l.readRune()
+	}
+	tok.Literal = string(l.input[position:l.position])
 	l.readRune()
 	return tok
 }
@@ -135,6 +166,14 @@ func (l *Lexer) readNumber() token.Token {
 	}
 	return tok
 }
+
+//func (l *Lexer) readRegex() token.Token  {
+//	var tok token.Token
+//
+//
+//	tok.Type = token.REGEX
+//
+//}
 
 func (l *Lexer) newToken(tokenType token.TokType, literal rune) token.Token {
 	return token.Token{Type: tokenType, Literal: string(literal), Position: l.position}
@@ -161,8 +200,47 @@ func (l *Lexer) skipWhitespace() {
 
 func (l *Lexer) readIdentifier() string {
 	position := l.position
-	for !unicode.Is(unicode.White_Space, l.ch) && l.ch != 0 {
+	for !unicode.Is(unicode.White_Space, l.ch) && !isReservedCharacter(l.ch) && l.ch != 0 {
 		l.readRune()
 	}
+
 	return string(l.input[position:l.position])
+}
+
+func isReservedCharacter(r rune) bool {
+	return r == '.' ||
+		r == '[' ||
+		r == ']' ||
+		r == '{' ||
+		r == '}' ||
+		r == '(' ||
+		r == ')' ||
+		r == ',' ||
+		r == '@' ||
+		r == '#' ||
+		r == ';' ||
+		r == ':' ||
+		r == '?' ||
+		r == '+' ||
+		r == '-' ||
+		r == '*' ||
+		r == '/' ||
+		r == '%' ||
+		r == '|' ||
+		r == '=' ||
+		r == '<' ||
+		r == '>' ||
+		r == '^' ||
+		r == '&' ||
+		r == '!' ||
+		r == '~' ||
+		r == '\'' ||
+		r == '"'
+}
+
+func max(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
