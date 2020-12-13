@@ -1,6 +1,7 @@
 package lexer
 
 import (
+	"fmt"
 	"github.com/brodo/jsonata-go/token"
 	"regexp"
 	"unicode"
@@ -140,12 +141,16 @@ func (l *Lexer) readUntilRune(enclosingRune rune, tokenType token.TokType) token
 		} else {
 			numBackslashes = max(numBackslashes, 0)
 		}
-		if numBackslashes%2 != 0 {
+		if numBackslashes%2 != 0 && l.peekRune() == enclosingRune {
 			isEscaped = true
 		} else {
 			isEscaped = false
 		}
 		l.readRune()
+		if l.ch == 0 {
+			errorString := fmt.Sprintf(`Lexing Error: Unexpected EOF at position %d. Expected "%s".`, l.position, string(enclosingRune))
+			panic(errorString)
+		}
 	}
 	tok.Literal = string(l.input[position:l.position])
 	l.readRune()

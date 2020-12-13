@@ -149,3 +149,31 @@ func TestNextTokenWhitespaceNames(t *testing.T) {
 		}
 	}
 }
+
+func TestNextTokenStrings(t *testing.T) {
+	input := `"this is a string test" 'this is another string test' "this \" is an escape test" 
+'this is "a string"' 'tripple \\\' escape!'`
+	tests := []struct {
+		expectedType    token.TokType
+		expectedLiteral string
+	}{
+		{token.STRING, "this is a string test"},
+		{token.STRING, "this is another string test"},
+		{token.STRING, "this \\\" is an escape test"},
+		{token.STRING, "this is \"a string\""},
+		{token.STRING, "tripple \\\\\\' escape!"},
+	}
+
+	l := NewLexer(input)
+
+	for i, tt := range tests {
+		tok := l.NextToken()
+		if tok.Type != tt.expectedType {
+			t.Fatalf("test[%d] - tokentype wrong. expected=%q, got=%q.", i, tt.expectedType, tok.Type)
+		}
+
+		if tok.Literal != tt.expectedLiteral {
+			t.Fatalf("test[%d] - literal wrong. expected=%q, got=%q", i, tt.expectedLiteral, tok.Literal)
+		}
+	}
+}
