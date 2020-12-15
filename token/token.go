@@ -3,9 +3,10 @@ package token
 type TokType string
 
 type Token struct {
-	Type     TokType
-	Literal  string
-	Position int
+	Type    TokType
+	Literal string
+	Start   int
+	End     int
 }
 
 const (
@@ -13,6 +14,7 @@ const (
 	IDENT  = "IDENT" // variable names, function names
 	NUMBER = "NUMBER"
 	STRING = "STRING"
+	REGEX  = "REGEX"
 
 	// Keywords
 	TRUE  = "TRUE"
@@ -60,7 +62,7 @@ const (
 	// Other
 	EOF     = "EOF"
 	INVALID = "INVALID"
-	REGEX   = "REGEX"
+	COMMENT = "COMMENT"
 )
 
 var keywords = map[string]TokType{

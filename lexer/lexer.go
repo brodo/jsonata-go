@@ -1,7 +1,6 @@
 package lexer
 
 import (
-	"fmt"
 	"github.com/brodo/jsonata-go/token"
 	"regexp"
 	"unicode"
@@ -49,7 +48,7 @@ func (l *Lexer) NextToken() token.Token {
 	switch l.ch {
 
 	case '.':
-		tok = l.makeTwoCharToken('.', token.DOT, token.RANGE)
+		tok = l.makeTwoRuneToken('.', token.DOT, token.RANGE)
 	case '[':
 		tok = l.newToken(token.LSBRACKET, l.ch)
 	case ']':
@@ -71,7 +70,7 @@ func (l *Lexer) NextToken() token.Token {
 	case ';':
 		tok = l.newToken(token.SEMICOLON, l.ch)
 	case ':':
-		tok = l.makeTwoCharToken('=', token.COLON, token.BIND)
+		tok = l.makeTwoRuneToken('=', token.COLON, token.BIND)
 	case '?':
 		tok = l.newToken(token.QUERY, l.ch)
 	case '+':
@@ -82,9 +81,14 @@ func (l *Lexer) NextToken() token.Token {
 		}
 		tok = l.newToken(token.MINUS, l.ch)
 	case '*':
-		tok = l.makeTwoCharToken('*', token.ASTERISK, token.DESCENDANTS)
+		tok = l.makeTwoRuneToken('*', token.ASTERISK, token.DESCENDANTS)
 	case '/':
-		tok = l.newToken(token.SLASH, l.ch)
+		l.readRune()
+		if l.ch == '*' {
+			tok = l.readComment()
+		} else {
+			tok = l.newToken(token.SLASH, '/')
+		}
 	case '%':
 		tok = l.newToken(token.PERCENT, l.ch)
 	case '|':
@@ -92,17 +96,17 @@ func (l *Lexer) NextToken() token.Token {
 	case '=':
 		tok = l.newToken(token.EQUALS, l.ch)
 	case '<':
-		tok = l.makeTwoCharToken('=', token.LT, token.LTE)
+		tok = l.makeTwoRuneToken('=', token.LT, token.LTE)
 	case '>':
-		tok = l.makeTwoCharToken('=', token.GT, token.GTE)
+		tok = l.makeTwoRuneToken('=', token.GT, token.GTE)
 	case '^':
 		tok = l.newToken(token.CARET, l.ch)
 	case '&':
 		tok = l.newToken(token.CONCAT, l.ch)
 	case '!':
-		tok = l.makeTwoCharToken('=', token.BANG, token.NQE)
+		tok = l.makeTwoRuneToken('=', token.BANG, token.NQE)
 	case '~':
-		tok = l.makeTwoCharToken('>', token.TILDE, token.CHAIN)
+		tok = l.makeTwoRuneToken('>', token.TILDE, token.CHAIN)
 	case '`':
 		tok = l.readUntilRune('`', token.IDENT)
 	case '\'':
@@ -114,8 +118,10 @@ func (l *Lexer) NextToken() token.Token {
 		tok.Type = token.EOF
 
 	default:
-		if !unicode.Is(unicode.White_Space, l.ch) && !isReservedCharacter(l.ch) && l.ch != 0 && !unicode.IsDigit(l.ch) {
+		if !unicode.Is(unicode.White_Space, l.ch) && !isReservedCharacter(l.peekRune()) && l.peekRune() != 0 && !unicode.IsDigit(l.ch) {
+			tok.Start = l.position
 			tok.Literal = l.readIdentifier()
+			tok.End = l.position
 			tok.Type = token.LookupIdent(tok.Literal)
 			return tok
 		} else if numberRegex.MatchString(string(l.input[l.position:])) {
@@ -129,8 +135,9 @@ func (l *Lexer) NextToken() token.Token {
 }
 
 func (l *Lexer) readUntilRune(enclosingRune rune, tokenType token.TokType) token.Token {
-	l.readRune()
 	var tok token.Token
+	tok.Start = l.position
+	l.readRune()
 	tok.Type = tokenType
 	position := l.position
 	numBackslashes := 0
@@ -148,12 +155,13 @@ func (l *Lexer) readUntilRune(enclosingRune rune, tokenType token.TokType) token
 		}
 		l.readRune()
 		if l.ch == 0 {
-			errorString := fmt.Sprintf(`Lexing Error: Unexpected EOF at position %d. Expected "%s".`, l.position, string(enclosingRune))
-			panic(errorString)
+			tok.Type = token.INVALID
+			break
 		}
 	}
 	tok.Literal = string(l.input[position:l.position])
 	l.readRune()
+	tok.End = l.position
 	return tok
 }
 
@@ -162,7 +170,9 @@ func (l *Lexer) readNumber() token.Token {
 	match := numberRegex.FindStringIndex(string(l.input[l.position:]))
 	tok.Type = token.NUMBER
 	tok.Literal = string(l.input[l.position : l.position+match[1]])
+	tok.Start = l.position
 	l.position += match[1]
+	tok.End = l.position
 	l.readPosition = l.position + 1
 	if l.position < len(l.input) {
 		l.ch = l.input[l.position]
@@ -181,11 +191,12 @@ func (l *Lexer) readNumber() token.Token {
 //}
 
 func (l *Lexer) newToken(tokenType token.TokType, literal rune) token.Token {
-	return token.Token{Type: tokenType, Literal: string(literal), Position: l.position}
+	return token.Token{Type: tokenType, Literal: string(literal), Start: l.position, End: l.position + 1}
 }
 
-func (l *Lexer) makeTwoCharToken(nextToken rune, oneCharType token.TokType, twoCharType token.TokType) token.Token {
+func (l *Lexer) makeTwoRuneToken(nextToken rune, oneCharType token.TokType, twoCharType token.TokType) token.Token {
 	var tok token.Token
+	tok.Start = l.position
 	if l.peekRune() == nextToken {
 		ch := l.ch
 		l.readRune()
@@ -194,6 +205,7 @@ func (l *Lexer) makeTwoCharToken(nextToken rune, oneCharType token.TokType, twoC
 	} else {
 		tok = l.newToken(oneCharType, l.ch)
 	}
+	tok.End = tok.Start + 2
 	return tok
 }
 
@@ -208,8 +220,29 @@ func (l *Lexer) readIdentifier() string {
 	for !unicode.Is(unicode.White_Space, l.ch) && !isReservedCharacter(l.ch) && l.ch != 0 {
 		l.readRune()
 	}
-
 	return string(l.input[position:l.position])
+}
+
+func (l *Lexer) readComment() token.Token {
+	var tok token.Token
+	tok.Start = l.position - 1 // the '/' was already read at this point
+	for {
+		if l.ch == '*' && l.peekRune() == '/' {
+			tok.Type = token.COMMENT
+			l.readRune() // closing '*'
+			l.readRune() // closing '/'
+			break
+		}
+
+		if l.ch == 0 {
+			tok.Type = token.INVALID
+			break
+		}
+		l.readRune()
+	}
+	tok.End = l.position
+	tok.Literal = string(l.input[tok.Start:tok.End])
+	return tok
 }
 
 func isReservedCharacter(r rune) bool {
